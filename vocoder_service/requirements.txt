@@ -9,3 +9,4 @@ matplotlib==3.1.3
 FastAPI[all]
 uvicorn
 httptools
+pytest
