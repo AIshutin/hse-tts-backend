@@ -55,8 +55,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.post("/")
 async def root(mel: List[List[List[float]]] = Body(...)):
-    #print(mel)
-    #print('inside query', flush=True)
     def generate_mels():
         print('generating', flush=True)
         with torch.no_grad():
@@ -79,4 +77,3 @@ def test_make_audio():
     response = client.post("/", json=x.tolist())
     assert response.status_code == 200
     open('out.wav', 'wb').write(response.content)
-    print('I love testing')
