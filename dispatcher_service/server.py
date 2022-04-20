@@ -7,6 +7,7 @@ import io
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from fastapi.testclient import TestClient
 import logging
 from scipy.io.wavfile import write
 import numpy as np
@@ -54,23 +55,11 @@ def hello_world(text: str):  # may be it's worth it to use async
     except Exception as exp:
         raise HTTPException(status_code=500, detail=exp.__repr__())
 
-'''
-@app.get('/')
-async def hello_world(text: str):  # may be it's worth it to use async
-    try:
-        text = clean_text(text)
-        print('i love text', text)
-        async with httpx.AsyncClient() as client:
-            resp_acoustic = await client.get("http://127.0.0.1:5000", params={"text": text})
-            # resp_acoustic = await asyncio.gather(resp_acoustic)
-            print(resp_acoustic)          
-            if resp_acoustic.status_code != 200:
-                raise AcousticException(resp_acoustic.text)
-            mel = [np.array(resp_acoustic.json()).T.tolist()]
-            resp_vocoder = await client.post("http://127.0.0.1:8000", json=mel)
-            if resp_vocoder.status_code != 200: 
-                raise VocoderException(resp_vocoder.text)
-            return StreamingResponse(io.BytesIO(resp_vocoder.content), media_type="audio/wav")
-    except Exception as exp:
-        return HTTPException(status_code=500, detail=str(exp))
-'''
+
+client = TestClient(app)
+
+def test_make_audio():
+    text = "Hello, world!"
+    response = client.post("/", json={'text': text})
+    assert response.status_code == 200
+    open('out.wav', 'wb').write(response.content)
