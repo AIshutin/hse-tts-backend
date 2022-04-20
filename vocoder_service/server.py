@@ -34,8 +34,6 @@ else:
 print(f'DEVICE is {device}')
 
 generator = Generator(h).to(device)
-
-print(checkpoint_file)
 state_dict_g = load_checkpoint(checkpoint_file, device)
 generator.load_state_dict(state_dict_g['generator'])
 

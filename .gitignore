@@ -1,3 +1,6 @@
+vocoder_service/generator_checkpoint.pt
+*.wav
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

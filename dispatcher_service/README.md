@@ -1,11 +1,9 @@
-# How to run server locally?
+# How to run server locally
 
 ```
 uvicorn server:app --host 0.0.0.0 --port 7000
 ```
-# How to use in Docker?
-
-To build:
+# How to use in Docker
 ```
 sudo docker build . --tag=dispatcher
 ```
