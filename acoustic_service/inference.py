@@ -48,17 +48,13 @@ from common.tb_dllogger import (init_inference_metadata, stdout_metric_format,
 from common.text import cmudict
 from common.text.text_processing import TextProcessing
 from fastpitch.pitch_transform import pitch_transform_custom
-from waveglow import model as glow
-from waveglow.denoiser import Denoiser
-
-sys.modules['glow'] = glow
 
 
 def parse_args(parser):
     """
     Parse commandline arguments.
     """
-    parser.add_argument('-i', '--input', type=str, #required=True,
+    parser.add_argument('-i', '--input', type=str,  # required=True,
                         help='Full path to the input text (phareses separated by newlines)')
     parser.add_argument('-o', '--output', default=None,
                         help='Output folder to save audio (file per phrase)')
@@ -71,12 +67,6 @@ def parse_args(parser):
                         help='Enable cudnn benchmark mode')
     parser.add_argument('--fastpitch', type=str,
                         help='Full path to the generator checkpoint file (skip to use ground truth mels)')
-    parser.add_argument('--waveglow', type=str,
-                        help='Full path to the WaveGlow model checkpoint file (skip to only generate mels)')
-    parser.add_argument('-s', '--sigma-infer', default=0.9, type=float,
-                        help='WaveGlow sigma')
-    parser.add_argument('-d', '--denoising-strength', default=0.01, type=float,
-                        help='WaveGlow denoising')
     parser.add_argument('-sr', '--sampling-rate', default=22050, type=int,
                         help='Sampling rate')
     parser.add_argument('--stft-hop-length', type=int, default=256,
@@ -88,8 +78,6 @@ def parse_args(parser):
                         help='Warmup iterations before measuring performance')
     parser.add_argument('--repeats', type=int, default=1,
                         help='Repeat inference for benchmarking')
-    parser.add_argument('--torchscript', action='store_true',
-                        help='Apply TorchScript')
     parser.add_argument('--ema', action='store_true',
                         help='Use EMA averaged model (if saved in checkpoints)')
     parser.add_argument('--dataset-path', type=str,
@@ -133,7 +121,6 @@ def parse_args(parser):
 
 
 def load_model_from_ckpt(checkpoint_path, ema, model):
-
     checkpoint_data = torch.load(checkpoint_path)
     status = ''
 
@@ -146,7 +133,7 @@ def load_model_from_ckpt(checkpoint_path, ema, model):
             print(f'WARNING: EMA weights missing for {checkpoint_data}')
 
         if any(key.startswith('module.') for key in sd):
-            sd = {k.replace('module.', ''): v for k,v in sd.items()}
+            sd = {k.replace('module.', ''): v for k, v in sd.items()}
         status += ' ' + str(model.load_state_dict(sd, strict=False))
     else:
         model = checkpoint_data['model']
@@ -155,28 +142,18 @@ def load_model_from_ckpt(checkpoint_path, ema, model):
     return model
 
 
-def load_and_setup_model(model_name, parser, checkpoint, amp, device,
-                         unk_args=[], forward_is_infer=False, ema=True,
-                         jitable=False):
-
-    model_parser = models.parse_model_args(model_name, parser, add_help=False)
+def load_and_setup_model(parser, checkpoint, amp, device,
+                         unk_args=[], forward_is_infer=False, ema=True):
+    model_parser = models.parse_model_args(parser, add_help=False)
     model_args, model_unk_args = model_parser.parse_known_args()
     unk_args[:] = list(set(unk_args) & set(model_unk_args))
 
-    model_config = models.get_model_config(model_name, model_args)
+    model_config = models.get_model_config(model_args)
 
-    model = models.get_model(model_name, model_config, device,
-                             forward_is_infer=forward_is_infer,
-                             jitable=jitable)
-
+    model = models.get_model(model_config, device,
+                             forward_is_infer=forward_is_infer)
     if checkpoint is not None:
         model = load_model_from_ckpt(checkpoint, ema, model)
-
-    if model_name == "WaveGlow":
-        for k, m in model.named_modules():
-            m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatability
-
-        model = model.remove_weightnorm(model)
 
     if amp:
         model.half()
@@ -184,22 +161,9 @@ def load_and_setup_model(model_name, parser, checkpoint, amp, device,
     return model.to(device)
 
 
-def load_fields(fpath):
-    lines = [l.strip() for l in open(fpath, encoding='utf-8')]
-    if fpath.endswith('.tsv'):
-        columns = lines[0].split('\t')
-        fields = list(zip(*[t.split('\t') for t in lines[1:]]))
-    else:
-        columns = ['text']
-        fields = [lines]
-    return {c:f for c, f in zip(columns, fields)}
-
-
 def prepare_input_sequence(fields, device, symbol_set, text_cleaners,
-                           batch_size=128, dataset=None, load_mels=False,
-                           load_pitch=False, p_arpabet=0.0):
+                           batch_size=128, p_arpabet=0.0):
     tp = TextProcessing(symbol_set, text_cleaners, p_arpabet=p_arpabet)
-
     fields['text'] = [torch.LongTensor(tp.encode_text(text))
                       for text in fields['text']]
     order = np.argsort([-t.size(0) for t in fields['text']])
@@ -209,34 +173,16 @@ def prepare_input_sequence(fields, device, symbol_set, text_cleaners,
 
     for t in fields['text']:
         print(tp.sequence_to_text(t.numpy()))
-
-    if load_mels:
-        assert 'mel' in fields
-        fields['mel'] = [
-            torch.load(Path(dataset, fields['mel'][i])).t() for i in order]
-        fields['mel_lens'] = torch.LongTensor([t.size(0) for t in fields['mel']])
-
-    if load_pitch:
-        assert 'pitch' in fields
-        fields['pitch'] = [
-            torch.load(Path(dataset, fields['pitch'][i])) for i in order]
-        fields['pitch_lens'] = torch.LongTensor([t.size(0) for t in fields['pitch']])
-
     if 'output' in fields:
         fields['output'] = [fields['output'][i] for i in order]
 
     # cut into batches & pad
     batches = []
     for b in range(0, len(order), batch_size):
-        batch = {f: values[b:b+batch_size] for f, values in fields.items()}
+        batch = {f: values[b:b + batch_size] for f, values in fields.items()}
         for f in batch:
             if f == 'text':
                 batch[f] = pad_sequence(batch[f], batch_first=True)
-            elif f == 'mel' and load_mels:
-                batch[f] = pad_sequence(batch[f], batch_first=True).permute(0, 2, 1)
-            elif f == 'pitch' and load_pitch:
-                batch[f] = pad_sequence(batch[f], batch_first=True)
-
             if type(batch[f]) is torch.Tensor:
                 batch[f] = batch[f].to(device)
         batches.append(batch)
@@ -249,6 +195,7 @@ def build_pitch_transformation(args):
         def custom_(pitch, pitch_lens, mean, std):
             return (pitch_transform_custom(pitch * std + mean, pitch_lens)
                     - mean) / std
+
         return custom_
 
     fun = 'pitch'
@@ -285,7 +232,7 @@ class MeasureTime(list):
         return MeasureTime((sum(ab) for ab in zip(self, other)), cuda=cuda)
 
 
-def get_mel(text:str):
+def get_mel(text: str):
     """
     Launches text to speech (inference).
     Inference is executed on a single GPU.
@@ -326,7 +273,6 @@ def get_mel(text:str):
     # args.text_cleaners = ['english_cleaners_v2']
     # args.torchscript = False
     # args.warmup_steps = 0
-    # args.waveglow = 'SKIP'
     if args.p_arpabet > 0.0:
         cmudict.initialize(args.cmudict_path, keep_ambiguous=True)
 
@@ -339,8 +285,8 @@ def get_mel(text:str):
     log_fpath = unique_log_fpath(log_fpath)
     try:
         DLLogger.init(backends=[JSONStreamBackend(Verbosity.DEFAULT, log_fpath),
-                            StdOutBackend(Verbosity.VERBOSE,
-                                          metric_format=stdout_metric_format)])
+                                StdOutBackend(Verbosity.VERBOSE,
+                                              metric_format=stdout_metric_format)])
 
         init_inference_metadata()
         [DLLogger.log("PARAMETER", {k: v}) for k, v in vars(args).items()]
@@ -349,38 +295,23 @@ def get_mel(text:str):
     device = torch.device('cuda' if args.cuda else 'cpu')
 
     if args.fastpitch != 'SKIP':
-        generator = load_and_setup_model(
-            'FastPitch', parser, args.fastpitch, args.amp, device,
-            unk_args=unk_args, forward_is_infer=True, ema=args.ema,
-            jitable=args.torchscript)
-
-        if args.torchscript:
-            generator = torch.jit.script(generator)
+        generator = load_and_setup_model(parser, args.fastpitch, args.amp, device,
+                                         unk_args=unk_args, forward_is_infer=True, ema=args.ema)
     else:
+        print("generator wasn't load")
         generator = None
-
-    if args.waveglow != 'SKIP':
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            waveglow = load_and_setup_model(
-                'WaveGlow', parser, args.waveglow, args.amp, device,
-                unk_args=unk_args, forward_is_infer=True, ema=args.ema)
-        denoiser = Denoiser(waveglow).to(device)
-        waveglow = getattr(waveglow, 'infer', waveglow)
-    else:
-        waveglow = None
 
     if len(unk_args) > 0:
         raise ValueError(f'Invalid options {unk_args}')
 
-    lines =(text,)
+    lines = (text,)
     columns = ('text',)
     fields = (lines,)
     fields = {c: f for c, f in zip(columns, fields)}  # load_fields()
     print(fields)
     batches = prepare_input_sequence(
         fields, device, args.symbol_set, args.text_cleaners, args.batch_size,
-        args.dataset_path, load_mels=(generator is None), p_arpabet=args.p_arpabet)
+        p_arpabet=args.p_arpabet)
 
     # Use real data rather than synthetic - FastPitch predicts len
     for _ in tqdm(range(args.warmup_steps), 'Warmup'):
@@ -388,21 +319,13 @@ def get_mel(text:str):
             if generator is not None:
                 b = batches[0]
                 mel, *_ = generator(b['text'])
-            if waveglow is not None:
-                audios = waveglow(mel, sigma=args.sigma_infer).float()
-                _ = denoiser(audios, strength=args.denoising_strength)
 
     gen_measures = MeasureTime(cuda=args.cuda)
-    waveglow_measures = MeasureTime(cuda=args.cuda)
 
     gen_kw = {'pace': args.pace,
               'speaker': args.speaker,
               'pitch_tgt': None,
               'pitch_transform': build_pitch_transformation(args)}
-
-    if args.torchscript:
-        gen_kw.pop('pitch_transform')
-        print('NOTE: Pitch transforms are disabled with TorchScript')
 
     all_utterances = 0
     all_samples = 0
@@ -428,46 +351,12 @@ def get_mel(text:str):
                 log(rep, {"fastpitch_frames/s": gen_infer_perf})
                 log(rep, {"fastpitch_latency": gen_measures[-1]})
 
-                if args.save_mels:
-                    for i, mel_ in enumerate(mel):
-                        m = mel_[:, :mel_lens[i].item()].permute(1, 0)
-                        fname = b['output'][i] if 'output' in b else f'mel_{i}.npy'
-                        mel_path = Path(args.output, Path(fname).stem + '.npy')
-                        result = m.cpu().numpy()
-                        np.save(mel_path, m.cpu().numpy())
-
-            if waveglow is not None:
-                with torch.no_grad(), waveglow_measures:
-                    audios = waveglow(mel, sigma=args.sigma_infer)
-                    audios = denoiser(audios.float(),
-                                      strength=args.denoising_strength
-                                      ).squeeze(1)
-
-                all_utterances += len(audios)
-                all_samples += sum(audio.size(0) for audio in audios)
-                waveglow_infer_perf = (
-                    audios.size(0) * audios.size(1) / waveglow_measures[-1])
-
-                log(rep, {"waveglow_samples/s": waveglow_infer_perf})
-                log(rep, {"waveglow_latency": waveglow_measures[-1]})
-
-                if args.output is not None and reps == 1:
-                    for i, audio in enumerate(audios):
-                        audio = audio[:mel_lens[i].item() * args.stft_hop_length]
-
-                        if args.fade_out:
-                            fade_len = args.fade_out * args.stft_hop_length
-                            fade_w = torch.linspace(1.0, 0.0, fade_len)
-                            audio[-fade_len:] *= fade_w.to(audio.device)
-
-                        audio = audio / torch.max(torch.abs(audio))
-                        fname = b['output'][i] if 'output' in b else f'audio_{i}.wav'
-                        audio_path = Path(args.output, fname)
-                        write(audio_path, args.sampling_rate, audio.cpu().numpy())
-
-            if generator is not None and waveglow is not None:
-                log(rep, {"latency": (gen_measures[-1] + waveglow_measures[-1])})
-
+                for i, mel_ in enumerate(mel):
+                    m = mel_[:, :mel_lens[i].item()].permute(1, 0)
+                    # fname = b['output'][i] if 'output' in b else f'mel_{i}.npy'
+                    # mel_path = Path(args.output, Path(fname).stem + '.npy')
+                    result = m.cpu().numpy()
+                    # np.save(mel_path, m.cpu().numpy())
     log_enabled = True
     if generator is not None:
         gm = np.sort(np.asarray(gen_measures))
@@ -479,24 +368,5 @@ def get_mel(text:str):
         log((), {"90%_fastpitch_latency": gm.mean() + norm.ppf((1.0 + 0.90) / 2) * gm.std()})
         log((), {"95%_fastpitch_latency": gm.mean() + norm.ppf((1.0 + 0.95) / 2) * gm.std()})
         log((), {"99%_fastpitch_latency": gm.mean() + norm.ppf((1.0 + 0.99) / 2) * gm.std()})
-    if waveglow is not None:
-        wm = np.sort(np.asarray(waveglow_measures))
-        rtf = all_samples / (all_utterances * wm.mean() * args.sampling_rate)
-        log((), {"avg_waveglow_samples/s": all_samples / wm.sum()})
-        log((), {"avg_waveglow_latency": wm.mean()})
-        log((), {"avg_waveglow_RTF": rtf})
-        log((), {"90%_waveglow_latency": wm.mean() + norm.ppf((1.0 + 0.90) / 2) * wm.std()})
-        log((), {"95%_waveglow_latency": wm.mean() + norm.ppf((1.0 + 0.95) / 2) * wm.std()})
-        log((), {"99%_waveglow_latency": wm.mean() + norm.ppf((1.0 + 0.99) / 2) * wm.std()})
-    if generator is not None and waveglow is not None:
-        m = gm + wm
-        rtf = all_samples / (all_utterances * m.mean() * args.sampling_rate)
-        log((), {"avg_samples/s": all_samples / m.sum()})
-        log((), {"avg_letters/s": all_letters / m.sum()})
-        log((), {"avg_latency": m.mean()})
-        log((), {"avg_RTF": rtf})
-        log((), {"90%_latency": m.mean() + norm.ppf((1.0 + 0.90) / 2) * m.std()})
-        log((), {"95%_latency": m.mean() + norm.ppf((1.0 + 0.95) / 2) * m.std()})
-        log((), {"99%_latency": m.mean() + norm.ppf((1.0 + 0.99) / 2) * m.std()})
     DLLogger.flush()
     return result

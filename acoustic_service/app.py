@@ -15,9 +15,8 @@ def hello_world():  # put application's code here
     print(text)
     sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
                 '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
-        , 'FastPitch_checkpoint_1000.pt', '--wn-channels', '256', '--batch-size',
-                '32', '--denoising-strength',
-                '0.01', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
+        , 'FastPitch_checkpoint_1000.pt', '--batch-size',
+                '32', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
                 '--cudnn-benchmark', '--p-arpabet', '1.0', '--energy-conditioning']
     ans = inference.get_mel(text)
     print(ans)
