@@ -10,10 +10,9 @@ mel_generator = MelGenerator()
 
 
 @app.route('/', methods=['GET', 'POST'])
-def hello_world():  # put application's code here
+def get_mel():  # put application's code here
     text = request.args.get('text')
     print(text)
-
     ans = mel_generator.get_mel(text)
     print(ans)
     ans = jsonify(ans.tolist())
