@@ -42,6 +42,8 @@ services:
       - "7000:7000"
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - REDIS_HOST=cache
+      - REDIS_PORT=6379
     devices:
       - /dev/nvidiactl
       - /dev/nvidia-uvm
@@ -55,5 +57,18 @@ services:
       - acoustic_servise
     networks:
       - mynet
+  cache:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --save 20 1 --loglevel warning
+    volumes: 
+      - cache:/data
+    networks:
+      - mynet
+volumes:
+  cache:
+    driver: local
 networks:
   mynet:

@@ -69,6 +69,10 @@ async def root(mel: List[List[List[float]]] = Body(...)):
             yield from f
     return StreamingResponse(generate_mels(), media_type="audio/wav")
 
+@app.get("/config")
+async def config():
+    return JSONResponse(content={"MAX_WAV_VALUE": MAX_WAV_VALUE, **json_config})
+
 
 client = TestClient(app)
 

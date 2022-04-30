@@ -7,3 +7,6 @@ FastAPI[all]
 uvicorn
 httptools
 httpx
+redis
+matplotlib
+Pillow
