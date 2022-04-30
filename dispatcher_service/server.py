@@ -30,8 +30,8 @@ class AcousticException(Exception):
 class VocoderException(Exception):
     pass
 
-ACOUSTIC_URL = os.getenv('ACOUSTIC_URL', "http://0.0.0.0:5000")
-VOCODER_URL  = os.getenv("VOCODER_URL",  "http://0.0.0.0:8000")
+ACOUSTIC_URL = os.getenv('ACOUSTIC_URL', "http://acoustic_servise:5000")
+VOCODER_URL  = os.getenv("VOCODER_URL",  "http://vocoder_service:8000")
 
 @app.get('/')
 def hello_world(text: str):  # may be it's worth it to use async
@@ -53,6 +53,7 @@ def hello_world(text: str):  # may be it's worth it to use async
                 raise VocoderException(resp_vocoder.text)
             return StreamingResponse(io.BytesIO(resp_vocoder.content), media_type="audio/wav")
     except Exception as exp:
+        print(exp.__repr__())
         raise HTTPException(status_code=500, detail=exp.__repr__())
 
 

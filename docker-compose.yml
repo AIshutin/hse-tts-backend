@@ -1,0 +1,60 @@
+version: "2.3"
+services:
+  acoustic_servise:
+    build: ./acoustic_service/.
+    ports:
+      - "5000:5000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    devices:
+      - /dev/nvidiactl
+      - /dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools
+      - /dev/nvidia0
+    networks:
+      - mynet
+  vocoder_service:
+    build: ./vocoder_service
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    devices:
+      - /dev/nvidiactl
+      - /dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools
+      - /dev/nvidia0
+    networks:
+      - mynet
+  telegram_service:
+    build: ./telegram_bot_service
+    ports:
+      - "5001:5001"
+    links:
+      - "dispatcher_service"
+    depends_on:
+      - dispatcher_service
+    networks:
+      - mynet
+
+  dispatcher_service:
+    build: ./dispatcher_service
+    ports:
+      - "7000:7000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    devices:
+      - /dev/nvidiactl
+      - /dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools
+      - /dev/nvidia0
+    links:
+      - "vocoder_service"
+      - "acoustic_servise"
+    depends_on:
+      - vocoder_service
+      - acoustic_servise
+    networks:
+      - mynet
+networks:
+  mynet:

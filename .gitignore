@@ -1,6 +1,7 @@
 vocoder_service/generator_checkpoint.pt
 *.wav
-
+telegram_bot_service/config.py # since it's there is only secret token
+acoustic_service/FastPitch_checkpoint_*.pt
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
