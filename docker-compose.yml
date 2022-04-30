@@ -36,7 +36,6 @@ services:
       - dispatcher_service
     networks:
       - mynet
-
   dispatcher_service:
     build: ./dispatcher_service
     ports:
