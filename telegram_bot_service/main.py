@@ -27,12 +27,20 @@ async def start_message(message: types.Message, state: FSMContext):
 async def enter_text_message(message: types.Message, state: FSMContext):
     await bot.send_message(message.from_user.id, "processing..",
                             parse_mode="Markdown")
-    resp = requests.get('http://127.0.0.1:7000/', params={'text': message.text})
-    if resp.status_code == 200:
-        await bot.send_audio(message.from_user.id,resp.content) #open("LJ001-0001.wav",'rb'))
-    else:
+    try:
+        #resp = requests.get('http://0.0.0.0:7000/', params={'text': message.text})
+        resp = requests.get('http://dispatcher_service:7000/', params={'text': message.text})
+        if resp.status_code == 200:
+            await bot.send_audio(message.from_user.id, resp.content)  # open("LJ001-0001.wav",'rb'))
+        else:
+            print(resp)
+            await bot.send_message(message.from_user.id, "Something was wrong... Try again",
+                                   parse_mode="Markdown")
+    except Exception as e:
+        print(e)
         await bot.send_message(message.from_user.id, "Something was wrong... Try again",
                                parse_mode="Markdown")
+
     await states.User.Entering_text.set()
 
 
