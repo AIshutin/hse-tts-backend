@@ -32,6 +32,7 @@ import time
 from pathlib import Path
 
 import dllogger as DLLogger
+from fastapi import FastAPI
 import numpy as np
 import torch
 from dllogger import StdOutBackend, JSONStreamBackend, Verbosity
@@ -48,16 +49,26 @@ from common.text.text_processing import TextProcessing
 
 
 class MelGenerator:
+    """
+    Class inference of educated model
+
+    """
+    
     def __init__(self):
+        """
+        
+        Constructor: load model and setup parametrs.
+
+        """
         self.device = None
         self.generator = None 
         self.p_arpabet = 1.0
         self.cmudict_path = 'cmudict/cmudict-0.7b'
-        self.fastpitch = 'FastPitch_checkpoint_1000.pt' # checkpoint path
+        self.checkpoint = 'FastPitch_checkpoint_1000.pt' # checkpoint path
         self.cudnn_benchmark = True
         self.output = './gen_mels'
         self.amp = False
-        self.ema = False
+        self.ema = False # Using EMA weights
         self.pace = 1.0
         self.repeats = 1 
         self.cuda = True # Run inference on a GPU using CUDA
@@ -74,15 +85,15 @@ class MelGenerator:
         self.pitch_transform_flatten = False
         self.pitch_transform_invert = False
         self.pitch_transform_shift = 0.0
-        #sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
-        #            '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
-        #    , 'FastPitch_checkpoint_1000.pt', '--batch-size',
-        #            '32', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
-        #            '--cudnn-benchmark', '--p-arpabet', '1.0', '--energy-conditioning']
+        sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
+                    '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
+            , 'FastPitch_checkpoint_1000.pt', '--batch-size',
+                    '32', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
+                    '--cudnn-benchmark', '--p-arpabet', '1.0', '--energy-conditioning']
         parser = argparse.ArgumentParser(description='PyTorch FastPitch Inference',
                                          allow_abbrev=False)
         parser = self.parse_args(parser)
-        #self.args, unk_args = parser.parse_known_args()
+        self.args, unk_args = parser.parse_known_args()
         # args.amp = False
         # args.batch_size = 32
         # args.cmudict_path = 'cmudict/cmudict-0.7b'
@@ -131,26 +142,23 @@ class MelGenerator:
                                                   metric_format=stdout_metric_format)])
 
             init_inference_metadata()
-            #[DLLogger.log("PARAMETER", {k: v}) for k, v in vars(self.args).items()]
         except Exception as e:
             print("Logger error", e)
         self.device = torch.device('cuda' if self.cuda else 'cpu')
 
-        self.generator = MelGenerator.load_and_setup_model(parser, self.fastpitch, self.amp, self.device,
-                                                               #unk_args=unk_args,
-                                                               unk_args=[],
-                                                                forward_is_infer=True,
-                                                               ema=self.ema)
+        self.generator = self.load_and_setup_model(parser, unk_args=[], forward_is_infer=True)
         
-        #if len(unk_args) > 0:
-        #    raise ValueError(f'Invalid options {unk_args}')
         if self.generator is None:
             raise Exception("Can't load generator")
 
-    
-    def parse_args(self,parser):
+
+    def parse_args(self, parser):
         """
         Parse commandline arguments.
+
+        Keyword arguments:
+        parser --  comandline args parser
+
         """
         parser.add_argument('-i', '--input', type=str,  # required=True,
                             help='Full path to the input text (phareses separated by newlines)')
@@ -163,7 +171,7 @@ class MelGenerator:
                             help='Run inference on a GPU using CUDA')
         parser.add_argument('--cudnn-benchmark', action='store_true',
                             help='Enable cudnn benchmark mode')
-        parser.add_argument('--fastpitch', type=str, default = self.fastpitch,
+        parser.add_argument('--fastpitch', type=str, default = self.checkpoint,
                             help='Full path to the generator checkpoint file (skip to use ground truth mels)')
         parser.add_argument('-sr', '--sampling-rate', default=self.sampling_rate, type=int,
                             help='Sampling rate')
@@ -215,9 +223,19 @@ class MelGenerator:
                           help='Number of speakers in the model.')
 
         return parser
-
+    # 
+    # checkpoint_path
     @staticmethod
     def load_model_from_ckpt(checkpoint_path, ema, model):
+        """
+        Load model from file.
+
+        Keyword arguments:
+        checkpoint_path 
+        ema -- True if model use ema weights
+        model 
+        
+        """
         checkpoint_data = torch.load(checkpoint_path)
         status = ''
 
@@ -238,24 +256,30 @@ class MelGenerator:
 
         return model
 
-    @staticmethod
-    def load_and_setup_model(parser, checkpoint, amp, device,
-                             unk_args=[], forward_is_infer=False, ema=True):
+    def load_and_setup_model(self, parser, 
+                             unk_args=[], forward_is_infer=False):
+        """
+        Load model and setup parameters
+
+        parser -- Comadline parser
+        unk_args -- array of args
+        forward_is_infer -- 
+        """
         model_parser = models.parse_model_args(parser, add_help=False)
         model_args, model_unk_args = model_parser.parse_known_args()
         unk_args[:] = list(set(unk_args) & set(model_unk_args))
 
         model_config = models.get_model_config(model_args)
 
-        model = models.get_model(model_config, device,
+        model = models.get_model(model_config, self.device,
                                  forward_is_infer=forward_is_infer)
-        if checkpoint is not None:
-            model = MelGenerator.load_model_from_ckpt(checkpoint, ema, model)
+        if self.checkpoint is not None:
+            model = MelGenerator.load_model_from_ckpt(self.checkpoint, self.ema, model)
 
-        if amp:
+        if self.amp:
             model.half()
         model.eval()
-        return model.to(device)
+        return model.to(self.device)
 
     @staticmethod
     def prepare_input_sequence(fields, device, symbol_set, text_cleaners,
