@@ -26,6 +26,7 @@
 # *****************************************************************************
 
 import argparse
+from email.policy import default
 import sys
 import time
 from pathlib import Path
@@ -67,6 +68,11 @@ class MelGenerator:
         self.warmup_steps = 0
         self.sampling_rate = 22050
         self.log_file='nvlog_infer.json'
+        self.pitch_transform_amplify = 1.0
+        self.pitch_transform_custom = False
+        self.pitch_transform_flatten = False
+        self.pitch_transform_invert = False
+        self.pitch_transform_shift = 0.0
         sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
                     '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
             , 'FastPitch_checkpoint_1000.pt', '--batch-size',
@@ -74,8 +80,8 @@ class MelGenerator:
                     '--cudnn-benchmark', '--p-arpabet', '1.0', '--energy-conditioning']
         parser = argparse.ArgumentParser(description='PyTorch FastPitch Inference',
                                          allow_abbrev=False)
-        parser = MelGenerator.parse_args(parser)
-        self.args, unk_args = parser.parse_known_args()
+        parser = self.parse_args(parser)
+        #self.args, unk_args = parser.parse_known_args()
         # args.amp = False
         # args.batch_size = 32
         # args.cmudict_path = 'cmudict/cmudict-0.7b'
@@ -124,75 +130,76 @@ class MelGenerator:
                                                   metric_format=stdout_metric_format)])
 
             init_inference_metadata()
-            [DLLogger.log("PARAMETER", {k: v}) for k, v in vars(self.args).items()]
+            #[DLLogger.log("PARAMETER", {k: v}) for k, v in vars(self.args).items()]
         except Exception as e:
-            print("was", e)
+            print("Logger error", e)
         self.device = torch.device('cuda' if self.cuda else 'cpu')
 
         self.generator = MelGenerator.load_and_setup_model(parser, self.fastpitch, self.amp, self.device,
-                                                               unk_args=unk_args, forward_is_infer=True,
+                                                               #unk_args=unk_args,
+                                                               unk_args=[],
+                                                                forward_is_infer=True,
                                                                ema=self.ema)
         
-        if len(unk_args) > 0:
-            raise ValueError(f'Invalid options {unk_args}')
+        #if len(unk_args) > 0:
+        #    raise ValueError(f'Invalid options {unk_args}')
         if self.generator is None:
             raise Exception("Can't load generator")
 
-    @staticmethod
-    def parse_args(parser):
+    
+    def parse_args(self,parser):
         """
         Parse commandline arguments.
         """
         parser.add_argument('-i', '--input', type=str,  # required=True,
                             help='Full path to the input text (phareses separated by newlines)')
-        parser.add_argument('-o', '--output', default=None,
+        parser.add_argument('-o', '--output', default=self.output,
                             help='Output folder to save audio (file per phrase)')
-        parser.add_argument('--log-file', type=str, default=None,
+        parser.add_argument('--log-file', type=str, default=self.log_file,
                             help='Path to a DLLogger log file')
         parser.add_argument('--save-mels', action='store_true', help='')
         parser.add_argument('--cuda', action='store_true',
                             help='Run inference on a GPU using CUDA')
         parser.add_argument('--cudnn-benchmark', action='store_true',
                             help='Enable cudnn benchmark mode')
-        parser.add_argument('--fastpitch', type=str,
+        parser.add_argument('--fastpitch', type=str, default = self.fastpitch,
                             help='Full path to the generator checkpoint file (skip to use ground truth mels)')
-        parser.add_argument('-sr', '--sampling-rate', default=22050, type=int,
+        parser.add_argument('-sr', '--sampling-rate', default=self.sampling_rate, type=int,
                             help='Sampling rate')
         parser.add_argument('--stft-hop-length', type=int, default=256,
                             help='STFT hop length for estimating audio length from mel size')
-        parser.add_argument('--amp', action='store_true',
+        parser.add_argument('--amp', action='store_true',default = self.amp,
                             help='Inference with AMP')
-        parser.add_argument('-bs', '--batch-size', type=int, default=64)
+        parser.add_argument('-bs', '--batch-size', type=int, default=self.batch_size)
         parser.add_argument('--warmup-steps', type=int, default=0,
                             help='Warmup iterations before measuring performance')
-        parser.add_argument('--repeats', type=int, default=1,
+        parser.add_argument('--repeats', type=int, default=self.repeats,
                             help='Repeat inference for benchmarking')
-        parser.add_argument('--ema', action='store_true',
+        parser.add_argument('--ema', action='store_true',default = self.ema,
                             help='Use EMA averaged model (if saved in checkpoints)')
         parser.add_argument('--dataset-path', type=str,
                             help='Path to dataset (for loading extra data fields)')
-        parser.add_argument('--speaker', type=int, default=0,
+        parser.add_argument('--speaker', type=int, default=self.speaker,
                             help='Speaker ID for a multi-speaker model')
-
-        parser.add_argument('--p-arpabet', type=float, default=0.0, help='')
+        parser.add_argument('--p-arpabet', type=float, default=self.p_arpabet, help='')
         parser.add_argument('--heteronyms-path', type=str, default='cmudict/heteronyms',
                             help='')
-        parser.add_argument('--cmudict-path', type=str, default='cmudict/cmudict-0.7b',
+        parser.add_argument('--cmudict-path', type=str, default=self.cmudict_path,
                             help='')
         transform = parser.add_argument_group('transform')
         transform.add_argument('--fade-out', type=int, default=10,
                                help='Number of fadeout frames at the end')
-        transform.add_argument('--pace', type=float, default=1.0,
+        transform.add_argument('--pace', type=float, default=self.pace,
                                help='Adjust the pace of speech')
-        transform.add_argument('--pitch-transform-flatten', action='store_true',
+        transform.add_argument('--pitch-transform-flatten', action='store_true',default = self.pitch_transform_flatten,
                                help='Flatten the pitch')
-        transform.add_argument('--pitch-transform-invert', action='store_true',
+        transform.add_argument('--pitch-transform-invert', action='store_true',default = self.pitch_transform_invert,
                                help='Invert the pitch wrt mean value')
-        transform.add_argument('--pitch-transform-amplify', type=float, default=1.0,
+        transform.add_argument('--pitch-transform-amplify', type=float, default=self.pitch_transform_amplify,
                                help='Amplify pitch variability, typical values are in the range (1.0, 3.0).')
-        transform.add_argument('--pitch-transform-shift', type=float, default=0.0,
+        transform.add_argument('--pitch-transform-shift', type=float, default=self.pitch_transform_shift,
                                help='Raise/lower the pitch by <hz>')
-        transform.add_argument('--pitch-transform-custom', action='store_true',
+        transform.add_argument('--pitch-transform-custom', action='store_true',default = self.pitch_transform_custom,
                                help='Apply the transform from pitch_transform.py')
 
         text_processing = parser.add_argument_group('Text processing parameters')
@@ -278,9 +285,8 @@ class MelGenerator:
 
         return batches
 
-    @staticmethod
-    def build_pitch_transformation(args):
-        if args.pitch_transform_custom:
+    def build_pitch_transformation(self):
+        if self.pitch_transform_custom:
             def custom_(pitch, pitch_lens, mean, std):
                 return (pitch_transform_custom(pitch * std + mean, pitch_lens)
                         - mean) / std
@@ -288,15 +294,15 @@ class MelGenerator:
             return custom_
 
         fun = 'pitch'
-        if args.pitch_transform_flatten:
+        if self.pitch_transform_flatten:
             fun = f'({fun}) * 0.0'
-        if args.pitch_transform_invert:
+        if self.pitch_transform_invert:
             fun = f'({fun}) * -1.0'
-        if args.pitch_transform_amplify:
-            ampl = args.pitch_transform_amplify
+        if self.pitch_transform_amplify:
+            ampl = self.pitch_transform_amplify
             fun = f'({fun}) * {ampl}'
-        if args.pitch_transform_shift != 0.0:
-            hz = args.pitch_transform_shift
+        if self.pitch_transform_shift != 0.0:
+            hz = self.pitch_transform_shift
             fun = f'({fun}) + {hz} / std'
         return eval(f'lambda pitch, pitch_lens, mean, std: {fun}')
 
@@ -345,7 +351,7 @@ class MelGenerator:
         gen_kw = {'pace': self.pace,
                   'speaker': self.speaker,
                   'pitch_tgt': None,
-                  'pitch_transform': MelGenerator.build_pitch_transformation(self.args)}
+                  'pitch_transform': self.build_pitch_transformation()}
 
         all_utterances = 0
         all_samples = 0
