@@ -18,7 +18,10 @@ cd ./telegram_bot_service/.
 
 ## Bot commands:  
 
-Start chat:  
-    /start
+Start chat:   
+
+    /start  
+    
 Get analitics:  
+
     /analitics  
