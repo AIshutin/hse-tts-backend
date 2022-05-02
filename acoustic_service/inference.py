@@ -74,11 +74,11 @@ class MelGenerator:
         self.pitch_transform_flatten = False
         self.pitch_transform_invert = False
         self.pitch_transform_shift = 0.0
-        sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
-                    '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
-            , 'FastPitch_checkpoint_1000.pt', '--batch-size',
-                    '32', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
-                    '--cudnn-benchmark', '--p-arpabet', '1.0', '--energy-conditioning']
+        #sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
+        #            '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
+        #    , 'FastPitch_checkpoint_1000.pt', '--batch-size',
+        #            '32', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
+        #            '--cudnn-benchmark', '--p-arpabet', '1.0', '--energy-conditioning']
         parser = argparse.ArgumentParser(description='PyTorch FastPitch Inference',
                                          allow_abbrev=False)
         parser = self.parse_args(parser)
