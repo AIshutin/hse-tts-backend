@@ -53,41 +53,40 @@ class MelGenerator:
     Class inference of educated model
 
     """
-    
+
     def __init__(self):
         """
-        
+
         Constructor: load model and setup parametrs.
 
         """
         self.device = None
-        self.generator = None 
+        self.generator = None
         self.p_arpabet = 1.0
         self.cmudict_path = 'cmudict/cmudict-0.7b'
-        self.checkpoint = 'FastPitch_checkpoint_1000.pt' # checkpoint path
+        self.checkpoint = 'FastPitch_checkpoint_1000.pt'  # checkpoint path
         self.cudnn_benchmark = True
         self.output = './gen_mels'
         self.amp = False
-        self.ema = False # Using EMA weights
+        self.ema = False  # Using EMA weights
         self.pace = 1.0
-        self.repeats = 1 
-        self.cuda = True # Run inference on a GPU using CUDA
-        self.speaker = 0 # Speaker ID for a multi-speaker model
+        self.repeats = 1
+        self.cuda = True  # Run inference on a GPU using CUDA
+        self.speaker = 0  # Speaker ID for a multi-speaker model
         self.batch_size = 32
         self.symbol_set = 'english_basic'
         self.text_cleaners = ['english_cleaners_v2']
         self.warmup_steps = 0
         self.sampling_rate = 22050
         self.stft_hop_length = 256
-        self.log_file='nvlog_infer.json'
+        self.log_file = 'nvlog_infer.json'
         self.pitch_transform_amplify = 1.0
         self.pitch_transform_custom = False
         self.pitch_transform_flatten = False
         self.pitch_transform_invert = False
         self.pitch_transform_shift = 0.0
         sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
-                    '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
-            , 'FastPitch_checkpoint_1000.pt', '--batch-size',
+                    '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch', 'FastPitch_checkpoint_1000.pt', '--batch-size',
                     '32', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
                     '--cudnn-benchmark', '--p-arpabet', '1.0', '--energy-conditioning']
         parser = argparse.ArgumentParser(description='PyTorch FastPitch Inference',
@@ -146,11 +145,11 @@ class MelGenerator:
             print("Logger error", e)
         self.device = torch.device('cuda' if self.cuda else 'cpu')
 
-        self.generator = self.load_and_setup_model(parser, unk_args=[], forward_is_infer=True)
-        
+        self.generator = self.load_and_setup_model(
+            parser, unk_args=[], forward_is_infer=True)
+
         if self.generator is None:
             raise Exception("Can't load generator")
-
 
     def parse_args(self, parser):
         """
@@ -171,26 +170,28 @@ class MelGenerator:
                             help='Run inference on a GPU using CUDA')
         parser.add_argument('--cudnn-benchmark', action='store_true',
                             help='Enable cudnn benchmark mode')
-        parser.add_argument('--fastpitch', type=str, default = self.checkpoint,
+        parser.add_argument('--fastpitch', type=str, default=self.checkpoint,
                             help='Full path to the generator checkpoint file (skip to use ground truth mels)')
         parser.add_argument('-sr', '--sampling-rate', default=self.sampling_rate, type=int,
                             help='Sampling rate')
         parser.add_argument('--stft-hop-length', type=int, default=self.stft_hop_length,
                             help='STFT hop length for estimating audio length from mel size')
-        parser.add_argument('--amp', action='store_true',default = self.amp,
+        parser.add_argument('--amp', action='store_true', default=self.amp,
                             help='Inference with AMP')
-        parser.add_argument('-bs', '--batch-size', type=int, default=self.batch_size)
+        parser.add_argument('-bs', '--batch-size',
+                            type=int, default=self.batch_size)
         parser.add_argument('--warmup-steps', type=int, default=0,
                             help='Warmup iterations before measuring performance')
         parser.add_argument('--repeats', type=int, default=self.repeats,
                             help='Repeat inference for benchmarking')
-        parser.add_argument('--ema', action='store_true',default = self.ema,
+        parser.add_argument('--ema', action='store_true', default=self.ema,
                             help='Use EMA averaged model (if saved in checkpoints)')
         parser.add_argument('--dataset-path', type=str,
                             help='Path to dataset (for loading extra data fields)')
         parser.add_argument('--speaker', type=int, default=self.speaker,
                             help='Speaker ID for a multi-speaker model')
-        parser.add_argument('--p-arpabet', type=float, default=self.p_arpabet, help='')
+        parser.add_argument('--p-arpabet', type=float,
+                            default=self.p_arpabet, help='')
         parser.add_argument('--heteronyms-path', type=str, default='cmudict/heteronyms',
                             help='')
         parser.add_argument('--cmudict-path', type=str, default=self.cmudict_path,
@@ -200,51 +201,49 @@ class MelGenerator:
                                help='Number of fadeout frames at the end')
         transform.add_argument('--pace', type=float, default=self.pace,
                                help='Adjust the pace of speech')
-        transform.add_argument('--pitch-transform-flatten', action='store_true',default = self.pitch_transform_flatten,
+        transform.add_argument('--pitch-transform-flatten', action='store_true', default=self.pitch_transform_flatten,
                                help='Flatten the pitch')
-        transform.add_argument('--pitch-transform-invert', action='store_true',default = self.pitch_transform_invert,
+        transform.add_argument('--pitch-transform-invert', action='store_true', default=self.pitch_transform_invert,
                                help='Invert the pitch wrt mean value')
         transform.add_argument('--pitch-transform-amplify', type=float, default=self.pitch_transform_amplify,
                                help='Amplify pitch variability, typical values are in the range (1.0, 3.0).')
         transform.add_argument('--pitch-transform-shift', type=float, default=self.pitch_transform_shift,
                                help='Raise/lower the pitch by <hz>')
-        transform.add_argument('--pitch-transform-custom', action='store_true',default = self.pitch_transform_custom,
+        transform.add_argument('--pitch-transform-custom', action='store_true', default=self.pitch_transform_custom,
                                help='Apply the transform from pitch_transform.py')
 
-        text_processing = parser.add_argument_group('Text processing parameters')
+        text_processing = parser.add_argument_group(
+            'Text processing parameters')
         text_processing.add_argument('--text-cleaners', nargs='*',
                                      default=['english_cleaners_v2'], type=str,
                                      help='Type of text cleaners for input text')
         text_processing.add_argument('--symbol-set', type=str, default='english_basic',
                                      help='Define symbol set for input text')
 
-        cond = parser.add_argument_group('conditioning on additional attributes')
+        cond = parser.add_argument_group(
+            'conditioning on additional attributes')
         cond.add_argument('--n-speakers', type=int, default=1,
                           help='Number of speakers in the model.')
 
         return parser
-    # 
-    # checkpoint_path
-    @staticmethod
-    def load_model_from_ckpt(checkpoint_path, ema, model):
+
+    def load_model_from_ckpt(self, model):
         """
         Load model from file.
 
         Keyword arguments:
-        checkpoint_path 
-        ema -- True if model use ema weights
-        model 
-        
+        model - model that is loaded
+
         """
-        checkpoint_data = torch.load(checkpoint_path)
+        checkpoint_data = torch.load(self.checkpoint)
         status = ''
 
         if 'state_dict' in checkpoint_data:
             sd = checkpoint_data['state_dict']
-            if ema and 'ema_state_dict' in checkpoint_data:
+            if self.ema and 'ema_state_dict' in checkpoint_data:
                 sd = checkpoint_data['ema_state_dict']
                 status += ' (EMA)'
-            elif ema and not 'ema_state_dict' in checkpoint_data:
+            elif self.ema and not 'ema_state_dict' in checkpoint_data:
                 print(f'WARNING: EMA weights missing for {checkpoint_data}')
 
             if any(key.startswith('module.') for key in sd):
@@ -252,18 +251,18 @@ class MelGenerator:
             status += ' ' + str(model.load_state_dict(sd, strict=False))
         else:
             model = checkpoint_data['model']
-        print(f'Loaded {checkpoint_path}{status}')
+        print(f'Loaded {self.checkpoint}{status}')
 
         return model
 
-    def load_and_setup_model(self, parser, 
+    def load_and_setup_model(self, parser,
                              unk_args=[], forward_is_infer=False):
         """
         Load model and setup parameters
 
         parser -- Comadline parser
         unk_args -- array of args
-        forward_is_infer -- 
+        forward_is_infer --
         """
         model_parser = models.parse_model_args(parser, add_help=False)
         model_args, model_unk_args = model_parser.parse_known_args()
@@ -274,23 +273,31 @@ class MelGenerator:
         model = models.get_model(model_config, self.device,
                                  forward_is_infer=forward_is_infer)
         if self.checkpoint is not None:
-            model = MelGenerator.load_model_from_ckpt(self.checkpoint, self.ema, model)
+            model = self.load_model_from_ckpt(model)
 
         if self.amp:
             model.half()
         model.eval()
         return model.to(self.device)
 
-    @staticmethod
-    def prepare_input_sequence(fields, device, symbol_set, text_cleaners,
-                               batch_size=128, p_arpabet=0.0):
-        tp = TextProcessing(symbol_set, text_cleaners, p_arpabet=p_arpabet)
+    def prepare_input_sequence(self, fields):
+
+        """
+        Prepare input text for model.
+
+        fields -- text 
+
+        """
+
+        tp = TextProcessing(
+            self.symbol_set, self.text_cleaners, p_arpabet=self.p_arpabet)
         fields['text'] = [torch.LongTensor(tp.encode_text(text))
                           for text in fields['text']]
         order = np.argsort([-t.size(0) for t in fields['text']])
 
         fields['text'] = [fields['text'][i] for i in order]
-        fields['text_lens'] = torch.LongTensor([t.size(0) for t in fields['text']])
+        fields['text_lens'] = torch.LongTensor(
+            [t.size(0) for t in fields['text']])
 
         for t in fields['text']:
             print(tp.sequence_to_text(t.numpy()))
@@ -299,18 +306,24 @@ class MelGenerator:
 
         # cut into batches & pad
         batches = []
-        for b in range(0, len(order), batch_size):
-            batch = {f: values[b:b + batch_size] for f, values in fields.items()}
+        for b in range(0, len(order), self.batch_size):
+            batch = {f: values[b:b + self.batch_size]
+                for f, values in fields.items()}
             for f in batch:
                 if f == 'text':
                     batch[f] = pad_sequence(batch[f], batch_first=True)
                 if type(batch[f]) is torch.Tensor:
-                    batch[f] = batch[f].to(device)
+                    batch[f] = batch[f].to(self.device)
             batches.append(batch)
 
         return batches
 
     def build_pitch_transformation(self):
+        """
+
+        Set up pitch values
+
+        """
         if self.pitch_transform_custom:
             def custom_(pitch, pitch_lens, mean, std):
                 return (pitch_transform_custom(pitch * std + mean, pitch_lens)
@@ -332,37 +345,53 @@ class MelGenerator:
         return eval(f'lambda pitch, pitch_lens, mean, std: {fun}')
 
     class MeasureTime(list):
+        """
+        Measure Time during mel generation
+        """
         def __init__(self, *args, cuda=True, **kwargs):
+            """
+                Initialising
+                cuda -- type of device 
+            """
             super(MelGenerator.MeasureTime, self).__init__(*args, **kwargs)
             self.cuda = cuda
 
         def __enter__(self):
+            """
+            Start measure
+            """
             if self.cuda:
                 torch.cuda.synchronize()
             self.t0 = time.perf_counter()
 
         def __exit__(self, exc_type, exc_value, exc_traceback):
+            """
+            End measure
+            """
             if self.cuda:
                 torch.cuda.synchronize()
             self.append(time.perf_counter() - self.t0)
 
         def __add__(self, other):
+            """
+            Sum of  measures
+            """
             assert len(self) == len(other)
-            return MelGenerator.MeasureTime((sum(ab) for ab in zip(self, other)), cuda=cuda)
+            return MelGenerator.MeasureTime((sum(ab) for ab in zip(self, other)), cuda=self.cuda)
 
     def get_mel(self, text: str):
         """
         Launches text to speech (inference).
         Inference is executed on a single GPU.
+
+        text -- input text
         """
         lines = (text,)
         columns = ('text',)
         fields = (lines,)
         fields = {c: f for c, f in zip(columns, fields)}  # load_fields()
         print(fields)
-        batches = MelGenerator.prepare_input_sequence(
-            fields, self.device, self.symbol_set, self.text_cleaners, self.batch_size,
-            p_arpabet=self.p_arpabet)
+        batches = self.prepare_input_sequence(fields)
 
         # Use real data rather than synthetic - FastPitch predicts len
         for _ in tqdm(range(self.warmup_steps), 'Warmup'):
