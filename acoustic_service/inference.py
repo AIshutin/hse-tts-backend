@@ -67,6 +67,7 @@ class MelGenerator:
         self.text_cleaners = ['english_cleaners_v2']
         self.warmup_steps = 0
         self.sampling_rate = 22050
+        self.stft_hop_length = 256
         self.log_file='nvlog_infer.json'
         self.pitch_transform_amplify = 1.0
         self.pitch_transform_custom = False
@@ -166,7 +167,7 @@ class MelGenerator:
                             help='Full path to the generator checkpoint file (skip to use ground truth mels)')
         parser.add_argument('-sr', '--sampling-rate', default=self.sampling_rate, type=int,
                             help='Sampling rate')
-        parser.add_argument('--stft-hop-length', type=int, default=256,
+        parser.add_argument('--stft-hop-length', type=int, default=self.stft_hop_length,
                             help='STFT hop length for estimating audio length from mel size')
         parser.add_argument('--amp', action='store_true',default = self.amp,
                             help='Inference with AMP')
