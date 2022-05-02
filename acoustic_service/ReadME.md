@@ -1,10 +1,10 @@
-#Acoustic_service
-
+# Acoustic service
+text -> mels
     cd ./acoustic_service/.
 
 ## To launch acoustic service local:
     flask run  
-or
+or  
     python3 app.py
 
 ## To launch acoustic service in Docker:
