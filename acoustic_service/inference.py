@@ -49,8 +49,24 @@ from common.text.text_processing import TextProcessing
 class MelGenerator:
     def __init__(self):
         self.device = None
-        self.generator = None
-        self.load = True
+        self.generator = None 
+        self.p_arpabet = 1.0
+        self.cmudict_path = 'cmudict/cmudict-0.7b'
+        self.fastpitch = 'FastPitch_checkpoint_1000.pt' # checkpoint path
+        self.cudnn_benchmark = True
+        self.output = './gen_mels'
+        self.amp = False
+        self.ema = False
+        self.pace = 1.0
+        self.repeats = 1 
+        self.cuda = True # Run inference on a GPU using CUDA
+        self.speaker = 0 # Speaker ID for a multi-speaker model
+        self.batch_size = 32
+        self.symbol_set = 'english_basic'
+        self.text_cleaners = ['english_cleaners_v2']
+        self.warmup_steps = 0
+        self.sampling_rate = 22050
+        self.log_file='nvlog_infer.json'
         sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
                     '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch'
             , 'FastPitch_checkpoint_1000.pt', '--batch-size',
@@ -92,15 +108,15 @@ class MelGenerator:
         # args.text_cleaners = ['english_cleaners_v2']
         # args.torchscript = False
         # args.warmup_steps = 0
-        if self.args.p_arpabet > 0.0:
-            cmudict.initialize(self.args.cmudict_path, keep_ambiguous=True)
+        if self.p_arpabet > 0.0:
+            cmudict.initialize(self.cmudict_path, keep_ambiguous=True)
 
-        torch.backends.cudnn.benchmark = self.args.cudnn_benchmark
+        torch.backends.cudnn.benchmark = self.cudnn_benchmark
 
-        if self.args.output is not None:
-            Path(self.args.output).mkdir(parents=False, exist_ok=True)
+        if self.output is not None:
+            Path(self.output).mkdir(parents=False, exist_ok=True)
 
-        log_fpath = self.args.log_file or str(Path(self.args.output, 'nvlog_infer.json'))
+        log_fpath = self.log_file or str(Path(self.output, 'nvlog_infer.json'))
         log_fpath = unique_log_fpath(log_fpath)
         try:
             DLLogger.init(backends=[JSONStreamBackend(Verbosity.DEFAULT, log_fpath),
@@ -111,20 +127,16 @@ class MelGenerator:
             [DLLogger.log("PARAMETER", {k: v}) for k, v in vars(self.args).items()]
         except Exception as e:
             print("was", e)
-        self.device = torch.device('cuda' if self.args.cuda else 'cpu')
+        self.device = torch.device('cuda' if self.cuda else 'cpu')
 
-        if self.args.fastpitch != 'SKIP':
-            self.generator = MelGenerator.load_and_setup_model(parser, self.args.fastpitch, self.args.amp, self.device,
+        self.generator = MelGenerator.load_and_setup_model(parser, self.fastpitch, self.amp, self.device,
                                                                unk_args=unk_args, forward_is_infer=True,
-                                                               ema=self.args.ema)
-        else:
-            print("generator wasn't load")
-            self.generator = None
-
+                                                               ema=self.ema)
+        
         if len(unk_args) > 0:
             raise ValueError(f'Invalid options {unk_args}')
-        if self.generator is not None:
-            MelGenerator.load = False
+        if self.generator is None:
+            raise Exception("Can't load generator")
 
     @staticmethod
     def parse_args(parser):
@@ -318,20 +330,20 @@ class MelGenerator:
         fields = {c: f for c, f in zip(columns, fields)}  # load_fields()
         print(fields)
         batches = MelGenerator.prepare_input_sequence(
-            fields, self.device, self.args.symbol_set, self.args.text_cleaners, self.args.batch_size,
-            p_arpabet=self.args.p_arpabet)
+            fields, self.device, self.symbol_set, self.text_cleaners, self.batch_size,
+            p_arpabet=self.p_arpabet)
 
         # Use real data rather than synthetic - FastPitch predicts len
-        for _ in tqdm(range(self.args.warmup_steps), 'Warmup'):
+        for _ in tqdm(range(self.warmup_steps), 'Warmup'):
             with torch.no_grad():
                 if self.generator is not None:
                     b = batches[0]
                     mel, *_ = self.generator(b['text'])
 
-        gen_measures = MelGenerator.MeasureTime(cuda=self.args.cuda)
+        gen_measures = MelGenerator.MeasureTime(cuda=self.cuda)
 
-        gen_kw = {'pace': self.args.pace,
-                  'speaker': self.args.speaker,
+        gen_kw = {'pace': self.pace,
+                  'speaker': self.speaker,
                   'pitch_tgt': None,
                   'pitch_transform': MelGenerator.build_pitch_transformation(self.args)}
 
@@ -340,7 +352,7 @@ class MelGenerator:
         all_letters = 0
         all_frames = 0
 
-        reps = self.args.repeats
+        reps = self.repeats
         log_enabled = reps == 1
         log = lambda s, d: DLLogger.log(step=s, data=d) if log_enabled else None
 
@@ -367,7 +379,7 @@ class MelGenerator:
         log_enabled = True
         if self.generator is not None:
             gm = np.sort(np.asarray(gen_measures))
-            rtf = all_samples / (all_utterances * gm.mean() * self.args.sampling_rate)
+            rtf = all_samples / (all_utterances * gm.mean() * self.sampling_rate)
             log((), {"avg_fastpitch_letters/s": all_letters / gm.sum()})
             log((), {"avg_fastpitch_frames/s": all_frames / gm.sum()})
             log((), {"avg_fastpitch_latency": gm.mean()})
