@@ -67,6 +67,7 @@ async def latency_test(message: types.Message, state: FSMContext):
     if resp.status_code != 200:
         await bot.send_message(message.from_user.id, "Something was wrong... Try again")
     else:
+        await bot.send_message(message.from_user.id, text.latency_test_start)
         ans = admin_analytics.latency_test()
         await bot.send_message(message.from_user.id, ans)
     await states.User.Entering_text.set()

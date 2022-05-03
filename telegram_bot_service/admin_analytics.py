@@ -5,6 +5,7 @@ from locust import HttpUser, task, constant_pacing
 from locust.env import Environment
 from locust.stats import stats_printer, stats_history,  StatsCSVFileWriter
 from locust.log import setup_logging
+from datetime import datetime, timezone, timedelta
 from math import floor
 import random
 log = "-"
@@ -32,12 +33,12 @@ def parse_analytics(data, prefix=""):
     return imgs, ''.join(text)
 
 class User(HttpUser):
-    wait_time = constant_pacing(1)
+    wait_time = constant_pacing(0.2)
     host = "http://dispatcher_service:7000"
 
     @task
     def my_task(self):
-        resp = "/?text=test+text+"+str(abs(floor(random.random()*100000000)))
+        resp = "/?text=test+text+new+"+str(abs(floor(random.random()*100000000)))
         self.client.get(resp)
 
     @task
@@ -64,10 +65,10 @@ def latency_test():
     gevent.spawn(stats_history, env.runner)
 
     # start the test
-    env.runner.start(1, spawn_rate=10)
+    env.runner.start(20, spawn_rate=1)
 
     # in 60 seconds stop the runner
-    gevent.spawn_later(3, lambda: env.runner.quit())
+    gevent.spawn_later(5, lambda: env.runner.quit())
 
     # wait for the greenlets
     env.runner.greenlet.join()
@@ -81,8 +82,11 @@ class safe_massage:
         env.events.request.add_listener(self.on_request)
         self.log = "Latency test Results\n"
     def get_message(self):
+        max_len = 2000
+        if(len(self.log)>max_len):
+            return "...\n"+self.log[-max_len::]
         return self.log
     def on_request(self,request_type, name, response_time, response_length, exception, context: dict, start_time=None, **kwargs):
         #print("request_type "+str(request_type)+"time "+str(response_time))
         self.log+='Name: {}, request_type: {},response_time: {},response_length: {},exception: {},context: {}, start_time: {}'\
-         '\n'.format(name,request_type,response_time,response_length,exception,context,start_time)
+         '\n'.format(name,request_type,response_time,response_length,exception,context,datetime.fromtimestamp(start_time, tz=timezone.utc))
