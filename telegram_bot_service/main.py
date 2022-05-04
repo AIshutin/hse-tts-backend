@@ -10,9 +10,11 @@ import text
 import requests
 import admin_analytics
 import numpy as np
-import torch
+#import torch
 import base64
 from io import BytesIO
+import matplotlib.pyplot as plt
+import pandas as pd
 
 bot = Bot(config.Token)
 dp = Dispatcher(bot, storage=MemoryStorage())
@@ -63,13 +65,38 @@ async def latency_test(message: types.Message, state: FSMContext):
         bot.send_message(message.from_user.id, f"You are not one of the admins. Please add your user id {message.from_user.id} to access this feature.")
         await states.User.Entering_text.set()
         return
-    resp = requests.get('http://dispatcher_service:7000/', params={'text': "text text"})
-    if resp.status_code != 200:
+    try:
+        resp = requests.get('http://dispatcher_service:7000/', params={'text': "text text"})
+        #await bot.send_message(message.from_user.id,message.text)
+        if resp.status_code != 200:
+            await bot.send_message(message.from_user.id, "Something was wrong... Try again")
+        else:
+            mes = message.text.split()
+            if(len(mes)==3 and mes[1].isdecimal() and mes[2].isdecimal()):
+                users_count = abs(int(mes[1]))
+                time_of_test = abs(int(mes[2]))
+                await bot.send_message(message.from_user.id, text.latency_test_start+"users count = "+mes[1]+" time of test = "+mes[2]+"s")
+                try:
+                    ans,img1 = admin_analytics.latency_test(users_count,time_of_test)
+                except:
+                    await bot.send_message(message.from_user.id, text.fail_test)
+                    await states.User.Entering_text.set()
+                    #raise
+                    return
+            else:
+                await bot.send_message(message.from_user.id, text.latency_test_start+" defaul parametrs")
+                try:
+                    ans,img1 = admin_analytics.latency_test()
+                except:
+                    await bot.send_message(message.from_user.id, text.fail_test)
+                    await states.User.Entering_text.set()
+                    #raise
+                    return
+            await bot.send_message(message.from_user.id,ans)
+            await bot.send_photo(message.from_user.id, img1)
+    except:
         await bot.send_message(message.from_user.id, "Something was wrong... Try again")
-    else:
-        await bot.send_message(message.from_user.id, text.latency_test_start)
-        ans = admin_analytics.latency_test()
-        await bot.send_message(message.from_user.id, ans)
+        #raise
     await states.User.Entering_text.set()
 
 @dp.message_handler(state=states.User.Entering_text)
@@ -90,6 +117,7 @@ async def enter_text_message(message: types.Message, state: FSMContext):
             await bot.send_audio(message.from_user.id, resp.content)  # open("LJ001-0001.wav",'rb'))
         else:
             print(resp)
+            
             await bot.send_message(message.from_user.id, "Something was wrong... Try again",
                                    parse_mode="Markdown")
     except Exception as e:
