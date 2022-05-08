@@ -51,13 +51,6 @@ class User(HttpUser):
         resp = "/?text=test+text+new+"+str(abs(floor(random.random()*100000000)))
         self.client.get(resp)
 
-    @task
-    def task_404(self):
-        """
-        connection error
-        """
-        print("/non-existing-path")
-
 
 def latency_test(users_count = 1,test_time = 10):
     """
