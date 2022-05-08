@@ -40,7 +40,7 @@ class User(HttpUser):
     """
     User that makes request for latency test
     """
-    wait_time = constant_pacing(1) # min time of seconds between requests
+    wait_time = constant_pacing(0.2) # min time of seconds between requests
     host = "http://dispatcher_service:7000"
 
     @task
@@ -66,7 +66,6 @@ def latency_test(users_count = 1,test_time = 10):
         text_time -- time of test
     """
     #launch without cash
-    ans = "-"
     # setup Environment and Runner
     env = Environment(user_classes=[User])
     #my_stat_to_csv = StatsCSVFileWriter(env, "14", "stat_tests.csv", full_history=True)
@@ -106,7 +105,7 @@ class SafeMassage:
         """
         data = self.get_data()
         self.log = "Test results:\n count of users: {} \n test time: {} s\n total count of requets: {}\n count of fails: {}\n mean response time: {:3f} ms \n"\
-        " max response time: {:3f} ms \n min response time: {:3f} ms \n ".format(users_count,test_time,data.shape[0],data.loc[data['exception'] == None].shape[0],
+        " max response time: {:3f} ms \n min response time: {:3f} ms \n ".format(users_count,test_time,data.shape[0],data.loc[data['exception'] != None].shape[0],
         data['response_time'].mean(), data['response_time'].max(),data['response_time'].min())
         
         max_len = 2000
@@ -133,12 +132,6 @@ class SafeMassage:
         plt.ylabel("response time ms")
         figdata = BytesIO()
         fig.savefig(figdata, format='png')
-        #buf = BytesIO()
-        #plt.savefig(buf, format='png')
-        #buf.seek(0)
-        #encoded_string = base64.b64encode(buf.read())
-        #return encoded_string.decode("ascii")
-        #return buf.read()
         return figdata.getvalue()
 
     def on_request(self,request_type, name, response_time, response_length, exception, context: dict, start_time=None, **kwargs):
