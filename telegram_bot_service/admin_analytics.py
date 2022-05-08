@@ -92,6 +92,7 @@ class SafeMassage:
         """
         env.events.request.add_listener(self.on_request)
         self.data = {'name':[],'start_time':[], 'request_type':[],'response_length':[],'exception':[],'response_time':[]}
+        
     def get_message(self, users_count, test_time):
         """
         get log message
