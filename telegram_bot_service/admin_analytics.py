@@ -17,7 +17,7 @@ def parse_analytics(data, prefix=""):
     """
     Prepare analitics for sending to admin.
     data -- json with analitics
-    prefix -- separator
+    prefix -- tab
     """
     IMG_THR = 100
     imgs = []
