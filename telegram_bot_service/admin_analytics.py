@@ -3,7 +3,7 @@ from io import BytesIO
 from pkgutil import get_data
 
 import gevent
-from locust import HttpUser, task, constant_pacing
+from locust import HttpUser, task, constant_pacing, constant
 from locust.env import Environment
 from locust.stats import stats_printer, stats_history,  StatsCSVFileWriter
 from locust.log import setup_logging
@@ -40,7 +40,7 @@ class User(HttpUser):
     """
     User that makes request for latency test
     """
-    wait_time = constant_pacing(0.2) # min time of seconds between requests
+    wait_time = constant_pacing(1) # min time of seconds between requests
     host = "http://dispatcher_service:7000"
 
     @task
