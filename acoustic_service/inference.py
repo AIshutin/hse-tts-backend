@@ -67,24 +67,24 @@ class MelGenerator:
         self.checkpoint = 'FastPitch_checkpoint_1000.pt'  # checkpoint path
         self.cudnn_benchmark = True
         self.output = './gen_mels'
-        self.amp = False
-        self.ema = False  # Using EMA weights
-        self.pace = 1.0
-        self.repeats = 1
+        # self.amp = False #using amp
+        # self.ema = False  # Using EMA weights
+        self.pace = 1.0 #how fast is pitch
+        # self.repeats = 1 
         self.cuda = True  # Run inference on a GPU using CUDA
         self.speaker = 0  # Speaker ID for a multi-speaker model
         self.batch_size = 32
         self.symbol_set = 'english_basic'
         self.text_cleaners = ['english_cleaners_v2']
-        self.warmup_steps = 0
-        self.sampling_rate = 22050
-        self.stft_hop_length = 256
+        # self.warmup_steps = 0
+        self.sampling_rate = 22050 
+        # self.stft_hop_length = 256
         self.log_file = 'nvlog_infer.json'
-        self.pitch_transform_amplify = 1.0
+        self.pitch_transform_amplify = 1.0 # energy
         self.pitch_transform_custom = False
         self.pitch_transform_flatten = False
-        self.pitch_transform_invert = False
-        self.pitch_transform_shift = 0.0
+        self.pitch_transform_invert = False # intonation transform
+        self.pitch_transform_shift = 0.0 # hight of voice
         sys.argv = ['inference.py', '-i', '', '-o', './gen_mels',
                     '--log-file', 'nvlog_infer.json', '--save-mels', '--fastpitch', 'FastPitch_checkpoint_1000.pt', '--batch-size',
                     '32', '--repeats', '1', '--warmup-steps', '0', '--speaker', '0', '--n-speakers', '1', '--cuda',
@@ -174,17 +174,17 @@ class MelGenerator:
                             help='Full path to the generator checkpoint file (skip to use ground truth mels)')
         parser.add_argument('-sr', '--sampling-rate', default=self.sampling_rate, type=int,
                             help='Sampling rate')
-        parser.add_argument('--stft-hop-length', type=int, default=self.stft_hop_length,
+        parser.add_argument('--stft-hop-length', type=int, default = 256,#self.stft_hop_length,
                             help='STFT hop length for estimating audio length from mel size')
-        parser.add_argument('--amp', action='store_true', default=self.amp,
+        parser.add_argument('--amp', action='store_true', default=False, #self.amp,
                             help='Inference with AMP')
         parser.add_argument('-bs', '--batch-size',
                             type=int, default=self.batch_size)
         parser.add_argument('--warmup-steps', type=int, default=0,
                             help='Warmup iterations before measuring performance')
-        parser.add_argument('--repeats', type=int, default=self.repeats,
+        parser.add_argument('--repeats', type=int, default= 1,#self.repeats,
                             help='Repeat inference for benchmarking')
-        parser.add_argument('--ema', action='store_true', default=self.ema,
+        parser.add_argument('--ema', action='store_true', default=False,#self.ema,
                             help='Use EMA averaged model (if saved in checkpoints)')
         parser.add_argument('--dataset-path', type=str,
                             help='Path to dataset (for loading extra data fields)')
@@ -240,10 +240,10 @@ class MelGenerator:
 
         if 'state_dict' in checkpoint_data:
             sd = checkpoint_data['state_dict']
-            if self.ema and 'ema_state_dict' in checkpoint_data:
+            if self.args.ema and 'ema_state_dict' in checkpoint_data:
                 sd = checkpoint_data['ema_state_dict']
                 status += ' (EMA)'
-            elif self.ema and not 'ema_state_dict' in checkpoint_data:
+            elif self.args.ema and not 'ema_state_dict' in checkpoint_data:
                 print(f'WARNING: EMA weights missing for {checkpoint_data}')
 
             if any(key.startswith('module.') for key in sd):
@@ -275,7 +275,7 @@ class MelGenerator:
         if self.checkpoint is not None:
             model = self.load_model_from_ckpt(model)
 
-        if self.amp:
+        if self.args.amp:
             model.half()
         model.eval()
         return model.to(self.device)
@@ -394,7 +394,7 @@ class MelGenerator:
         batches = self.prepare_input_sequence(fields)
 
         # Use real data rather than synthetic - FastPitch predicts len
-        for _ in tqdm(range(self.warmup_steps), 'Warmup'):
+        for _ in tqdm(range(self.args.warmup_steps), 'Warmup'):
             with torch.no_grad():
                 if self.generator is not None:
                     b = batches[0]
@@ -412,7 +412,7 @@ class MelGenerator:
         all_letters = 0
         all_frames = 0
 
-        reps = self.repeats
+        reps = self.args.repeats
         log_enabled = reps == 1
         log = lambda s, d: DLLogger.log(step=s, data=d) if log_enabled else None
 

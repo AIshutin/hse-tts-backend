@@ -33,11 +33,13 @@ from fastpitch.model_jit import FastPitchJIT
 
 
 def parse_model_args(parser, add_help=False):
+    "parse arguments of model"
     from fastpitch.arg_parser import parse_fastpitch_args
     return parse_fastpitch_args(parser, add_help)
 
 
 def init_bn(module):
+    "init bn"
     if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
         if module.affine:
             module.weight.data.uniform_()
@@ -47,6 +49,7 @@ def init_bn(module):
 
 def get_model(model_config, device,
               uniform_initialize_bn_weight=False, forward_is_infer=False):
+    "initialisation of model"
     model = FastPitch(**model_config)
 
     if forward_is_infer:
@@ -59,7 +62,7 @@ def get_model(model_config, device,
 
 
 def get_model_config(args):
-    """ Code chooses a model based on name"""
+    "creating model config"
     model_config = dict(
         # io
         n_mel_channels=args.n_mel_channels,
