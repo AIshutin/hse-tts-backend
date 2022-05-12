@@ -52,9 +52,11 @@ services:
     links:
       - "vocoder_service"
       - "acoustic_servise"
+      - "normalization_service"
     depends_on:
       - vocoder_service
       - acoustic_servise
+      - normalization_service
     networks:
       - mynet
   cache:
@@ -65,6 +67,19 @@ services:
     command: redis-server --save 20 1 --loglevel warning
     volumes: 
       - cache:/data
+    networks:
+      - mynet
+  normalization_service:
+    build: ./normalization_service
+    ports:
+      - "9997:9997"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    devices:
+      - /dev/nvidiactl
+      - /dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools
+      - /dev/nvidia0
     networks:
       - mynet
 volumes:

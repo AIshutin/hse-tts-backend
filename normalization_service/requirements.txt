@@ -1,0 +1,6 @@
+flask
+Cython
+pynini
+python-dateutil
+tqdm
+torch>=1.4.0
