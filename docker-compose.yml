@@ -13,6 +13,13 @@ services:
       - /dev/nvidia0
     networks:
       - mynet
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
   vocoder_service:
     build: ./vocoder_service
     ports:
@@ -26,6 +33,13 @@ services:
       - /dev/nvidia0
     networks:
       - mynet
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
   telegram_service:
     build: ./telegram_bot_service
     ports:
