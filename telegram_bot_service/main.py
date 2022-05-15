@@ -19,7 +19,7 @@ import pandas as pd
 bot = Bot(config.Token)
 dp = Dispatcher(bot, storage=MemoryStorage())
 
-MAX_TEXT_LENGTH = 800 # Maximun lenth of message for audio generation
+MAX_TEXT_LENGTH = 250 # Maximun lenth of message for audio generation
 
 
 @dp.message_handler(commands=['start'], state='*')
