@@ -40,8 +40,12 @@ class VocoderException(Exception):
 class RedisException(Exception):
     pass
 
+class NormalizationException(Exception):
+    pass
+
 ACOUSTIC_URL = os.getenv('ACOUSTIC_URL', "http://acoustic_servise:5000/")
 VOCODER_URL  = os.getenv("VOCODER_URL",  "http://vocoder_service:8000/")
+NORMALIZATION_URL = os.getenv('ACOUSTIC_URL', "http://normalization_service:9997/")
 r = redis.Redis(host=os.getenv("REDIS_HOST"), port=os.getenv("REDIS_PORT"), db=0)
 
 class StatisticsClass:
@@ -96,13 +100,19 @@ def tts(text: str):  # may be it's worth it to use async
     start_T = time.time()
     N = len(text)
     try:
-        text = clean_text(text)
-        try:
-            out_bytes = r.get(text)
-        except Exception as exp:
-            raise RedisException(exp.__repr__())
-        if out_bytes is None:
-            with httpx.Client() as client:
+        with httpx.Client() as client:
+            try:
+                resp_normalization = client.get(NORMALIZATION_URL, params={"text": text})
+                print('NORMALIZED', resp_normalization.text, flush=True)
+                assert(resp_normalization.status_code == 200)
+                text = clean_text(resp_normalization.text)
+            except Exception as exp:
+                raise AcousticException(resp_normalization.text)
+            try:
+                out_bytes = r.get(text)
+            except Exception as exp:
+                raise RedisException(exp.__repr__())
+            if out_bytes is None:
                 try:
                     resp_acoustic = client.get(ACOUSTIC_URL, params={"text": text})
                 except Exception as exp:
@@ -121,9 +131,9 @@ def tts(text: str):  # may be it's worth it to use async
                 except Exception as exp:
                     raise RedisException(exp.__repr__())
                 out_bytes = resp_vocoder.content
-            statistics.add_record(N, time.time() - start_T)
-        else:
-            statistics.cached_queries_cnt += 1
+                statistics.add_record(N, time.time() - start_T)
+            else:
+                statistics.cached_queries_cnt += 1
         return StreamingResponse(io.BytesIO(out_bytes), media_type="audio/wav")
     except Exception as exp:
         statistics.failed_queries_cnt += 1
