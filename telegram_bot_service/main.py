@@ -40,8 +40,9 @@ async def get_analytics(message: types.Message, state: FSMContext):
     Send analitics with command /analitics. (only for admins).
     """
     if message.from_user.id not in config.ADMIN_USER_IDS:
-        print(message.from_user.id, ' analytics access attempt', flush=True)
-        bot.send_message(message.from_user.id, f"You are not one of the admins. Please add your user id {message.from_user.id} to access this feature.")
+        #print(message.from_user.id, ' analytics access attempt', flush=True)
+        
+        await bot.send_message(message.from_user.id, f"You are not one of the admins. Please add your user id {message.from_user.id} to access this feature.")
         await states.User.Entering_text.set()
         return
     resp = requests.get('http://dispatcher_service:7000/analytics')
@@ -61,8 +62,8 @@ async def latency_test(message: types.Message, state: FSMContext):
     Send results of latency test. (only for admins).
     """
     if message.from_user.id not in config.ADMIN_USER_IDS:
-        print(message.from_user.id, ' latency_test access attempt', flush=True)
-        bot.send_message(message.from_user.id, f"You are not one of the admins. Please add your user id {message.from_user.id} to access this feature.")
+        #print(message.from_user.id, ' latency_test access attempt', flush=True)
+        await bot.send_message(message.from_user.id, f"You are not one of the admins. Please add your user id {message.from_user.id} to access this feature.")
         await states.User.Entering_text.set()
         return
     try:
