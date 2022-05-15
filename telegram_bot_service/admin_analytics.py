@@ -99,8 +99,8 @@ class SafeMassage:
         """
         data = self.get_data()
         self.log = "Test results:\n count of users: {} \n test time: {} s\n total count of requets: {}\n count of fails: {}\n mean response time: {:3f} ms \n"\
-        " max response time: {:3f} ms \n min response time: {:3f} ms \n ".format(users_count,test_time,data.shape[0],data.loc[data['exception'] != None].shape[0],
-        data['response_time'].mean(), data['response_time'].max(),data['response_time'].min())
+        " max response time: {:3f} ms \n min response time: {:3f} ms \n ".format(users_count,test_time,data.shape[0],data.shape[0] - data[data['exception'].isna()].shape[0],
+        data['response_time'].mean(), data['response_time'].max(),data['response_time'].min()) #+"/n"+str(data[data['exception'].isna()]['exception'])
         
         max_len = 2000
         if(len(self.log)>max_len):
