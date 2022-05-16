@@ -15,7 +15,7 @@ import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
 import pandas as pd
-
+#import mos_test
 bot = Bot(config.Token)
 dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -28,6 +28,7 @@ async def start_message(message: types.Message, state: FSMContext):
     Start working with /start command
     Send first message.
     """
+    #mos_test.get_audio()
     await bot.send_message(message.from_user.id, text.hello_message,
                            parse_mode="Markdown")
     await states.User.Entering_text.set()
@@ -118,7 +119,6 @@ async def enter_text_message(message: types.Message, state: FSMContext):
             await bot.send_audio(message.from_user.id, resp.content)  # open("LJ001-0001.wav",'rb'))
         else:
             print(resp)
-            
             await bot.send_message(message.from_user.id, "Something was wrong... Try again",
                                    parse_mode="Markdown")
     except Exception as e:

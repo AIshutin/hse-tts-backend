@@ -134,6 +134,7 @@ def tts(text: str):  # may be it's worth it to use async
                 statistics.add_record(N, time.time() - start_T)
             else:
                 statistics.cached_queries_cnt += 1
+        print('TIME', time.time() - start_T)
         return StreamingResponse(io.BytesIO(out_bytes), media_type="audio/wav")
     except Exception as exp:
         statistics.failed_queries_cnt += 1

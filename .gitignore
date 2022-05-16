@@ -134,3 +134,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 latency_test.py
+
+telegram_bot_service/texts.txt
+telegram_bot_service/mos_test.py
+telegram_bot_service/mos_audio
+telegram_bot_service/copy_audio.py
+telegram_bot_service/real_audio_test
+telegram_bot_service/our_audio
