@@ -17,12 +17,12 @@
     docker rm telegram_bot_service 
 
 ## Bot commands:  
-####For all users:  
+#### For all users:  
 
 Start chat:   
 
     /start  
-####For developers only:  
+#### For developers only:  
 
 Get analitics:  
 
