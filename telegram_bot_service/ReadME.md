@@ -1,5 +1,5 @@
 # Telegram bot service
-cd ./telegram_bot_service/.
+
 ## Quick start  
 
     cd ./telegram_bot_service/.
