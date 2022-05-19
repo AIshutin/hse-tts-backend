@@ -17,16 +17,17 @@ cd ./telegram_bot_service/.
     docker rm telegram_bot_service 
 
 ## Bot commands:  
-For all users:  
+####For all users:  
 
 Start chat:   
 
     /start  
-For developers only:  
+####For developers only:  
 
 Get analitics:  
 
     /analitics    
     
-Testing:
-    /latency_test
+Testing:  
+    /latency_test  
+    
