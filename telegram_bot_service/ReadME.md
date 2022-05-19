@@ -29,5 +29,5 @@ Get analitics:
     /analitics    
     
 Testing:  
-    /latency_test  
-    
+
+    /latency_test    
